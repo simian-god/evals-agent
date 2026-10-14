@@ -197,7 +197,6 @@ case, so every future subject inherits it.
 
 ## License
 
-GNU GPL v3. If you distribute a modified version, its source must be GPL v3
-too. Note that copyleft obliges whoever *distributes* a derivative to publish
-its source — it does not oblige anyone to send patches upstream, so if you fix
-something here, a PR is still appreciated.
+MIT. Use it, fork it, ship it in something commercial — just keep the copyright
+notice. No obligation to publish your changes, though a PR is appreciated if you
+improve something.
