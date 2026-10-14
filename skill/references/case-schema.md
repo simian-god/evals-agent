@@ -116,6 +116,12 @@ rubric:
 
 ## Authoring from a spreadsheet
 
+**The CSV is the review artifact.** A directory of YAML files is how the suite
+is stored; the spreadsheet is how a human actually reads it, changes what
+matters, and deletes what does not. Step 6 of the pipeline is that handoff, and
+it is not optional - a suite nobody reviewed is a suite that tests what the
+evaluator guessed.
+
 The suite round-trips through CSV for bulk editing:
 
 ```bash

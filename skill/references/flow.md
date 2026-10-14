@@ -18,6 +18,24 @@ findings.jsonl        rubric findings (appended by you)
 report.md / run.json  written by `evals report`
 ```
 
+## The review handoff
+
+Before the gate, the human reviews the suite as a spreadsheet - that is the step
+where the suite stops being yours and becomes theirs:
+
+```bash
+evals cases --subject <id> --export-csv   # authoring/<id>_evals_<ddmmyyHHMM>.csv
+#   ... they edit severity, runs, turn_cap, persona, checks, or delete rows ...
+evals cases --subject <id> --import-csv   # newest export, reports what changed
+evals cases --subject <id> --write        # refresh INDEX.md
+```
+
+Report the import result back verbatim: created, updated, drafted, problems. Two
+outcomes must never pass silently - a `checks` cell that conflicted with the
+YAML (the edit was NOT applied) and a row that landed in `cases/drafts/` (it
+cannot run until you write its assertions). Re-export after any change you make,
+so the sheet they hold is never behind the suite.
+
 ## Before anything executes
 
 1. `evals fingerprint --subject <id>` - if stale, handle staleness first.

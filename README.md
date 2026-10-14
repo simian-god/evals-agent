@@ -76,11 +76,21 @@ are written against.
 | 3 | coverage map: effects × risk classes, **before** any questions | `coverage.md` |
 | 4 | interview — closed questions derived from your code | `intent.md`, `fingerprint.json` |
 | 5 | suite generation | `cases/*.yaml` |
-| 6 | go/no-go gate (nothing executes without it) | — |
-| 7 | execution — hostile personas against the live agent | transcripts, effect streams |
-| 8 | grading — deterministic assertions + a rubric pass | `results.jsonl`, `findings.jsonl` |
-| 9 | report + regression diff | `report.md`, `run.json` |
-| 10 | adapt coverage from what broke | updated `coverage.md` |
+| 6 | **suite review — you read and edit the suite as a spreadsheet** | `authoring/<id>_evals_<ddmmyyHHMM>.csv` |
+| 7 | go/no-go gate (nothing executes without it) | — |
+| 8 | execution — hostile personas against the live agent | transcripts, effect streams |
+| 9 | grading — deterministic assertions + a rubric pass | `results.jsonl`, `findings.jsonl` |
+| 10 | report + regression diff | `report.md`, `run.json` |
+| 11 | adapt coverage from what broke | updated `coverage.md` |
+
+Step 6 is a real handoff. A directory of YAML files is how a suite is stored,
+not how a human reads one, so the evaluator exports the whole suite as a CSV and
+stops. You change severities, attempt counts, turn caps, personas, the
+assertions themselves — or delete rows you do not care about — and it imports
+your edits back, reporting exactly what changed. The importer merges scalars
+only: a spreadsheet can tighten a case but can never silently weaken one, and a
+row with no checkable claim becomes a draft the runner refuses to load rather
+than a test that cannot fail.
 
 The coverage map comes *before* the interview on purpose. An evaluator that
 interrogates you first can only ask "what are the edge cases?", which nobody
@@ -122,9 +132,12 @@ bun harness/src/cli.ts grade       --session <s> --run <ts> --attempt 1
 bun harness/src/cli.ts report      --subject <id> --run <ts>
 ```
 
-Cases are YAML, self-documenting, and round-trip through CSV for bulk editing
-(`--export-csv` / `--import-csv`) — with the importer refusing to let a
-spreadsheet weaken an existing case's assertions.
+Cases are YAML and self-documenting, but the **CSV is the review surface**:
+
+```bash
+bun harness/src/cli.ts cases --subject <id> --export-csv   # the suite, as a sheet
+bun harness/src/cli.ts cases --subject <id> --import-csv   # your edits, applied
+```
 
 ## Adding your agent
 
