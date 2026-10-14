@@ -67,7 +67,7 @@ Every call through those seams becomes an **effect** —
 `{turn, kind, name, args, result}` — and the effect stream is what assertions
 are written against.
 
-### The ten steps
+### The steps
 
 | # | step | artifact |
 |---|---|---|
