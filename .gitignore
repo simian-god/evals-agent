@@ -1,0 +1,18 @@
+# Subjects are YOURS. Everything about the agents you evaluate - adapters,
+# intent specs, coverage maps, cases, transcripts, reports - stays local, so
+# this repo publishes the evaluator and never your agents or their data.
+subjects/*
+!subjects/README.md
+
+# daemon runtime state
+.evals-daemon.json
+
+# bun / node
+node_modules/
+bun.lockb
+
+# editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

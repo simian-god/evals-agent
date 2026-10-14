@@ -1,0 +1,16 @@
+{
+  "name": "evals-harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Thin execution layer for the evals agent: SQLite world, effect capture, chat daemon, assertions, reports.",
+  "scripts": {
+    "evals": "bun src/cli.ts",
+    "daemon": "bun src/daemon.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.5.0"
+  }
+}
