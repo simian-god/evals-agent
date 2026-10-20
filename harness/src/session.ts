@@ -1,7 +1,6 @@
 // One case session: a fresh world, a live subject, and a growing effect stream.
-import { buildSchema, openWorld, type World } from "./world/sqlite.ts";
-import { makePgShim } from "./world/pg-shim.ts";
-import { makeFakeDb } from "./capture/db.ts";
+import { openSqliteWorld } from "./world/sqlite.ts";
+import type { EvalWorld } from "./world/index.ts";
 import { bindWorld } from "./runtime.ts";
 import type { AdapterContext, Effect, SubjectAdapter, SubjectSession } from "./types.ts";
 
@@ -16,7 +15,7 @@ export interface SessionOptions {
 export class Session {
   readonly effects: Effect[] = [];
   readonly transcript: { turn: number; role: "adversary" | "subject"; text: string }[] = [];
-  world!: World;
+  world!: EvalWorld;
   private subject!: SubjectSession;
   private turnNo = 0;
   private seq = 0;
@@ -40,19 +39,17 @@ export class Session {
     // Env must be set before the subject's config module is first imported.
     for (const [k, v] of Object.entries(adapter.env)) process.env[k] = v;
 
-    if (this.opts.rebuildSchema) buildSchema(adapter.schemaFiles, schemaPath);
-    this.world = openWorld(schemaPath);
+    this.world = openSqliteWorld({
+      schemaFiles: adapter.schemaFiles,
+      schemaPath,
+      rebuild: this.opts.rebuildSchema ?? false,
+    });
 
-    // Seed with the SUBJECT'S own seed code through a postgres-shaped shim.
-    await adapter.seed(makePgShim(this.world.db));
+    // Seed with the SUBJECT'S own seed code (ADAPT-4).
+    await adapter.seed(this.world.seedClient());
 
     const ctx = this.ctx();
-    const fake = makeFakeDb(this.world.db, {
-      pk: this.world.pk,
-      rpcs: adapter.rpcs,
-      emit: ctx.emit,
-    });
-    bindWorld(fake);
+    bindWorld(this.world.recordingClient({ rpcs: adapter.rpcs, emit: ctx.emit }));
 
     this.subject = await adapter.open(ctx);
     this.bsp = (this.subject as any).bsp;
@@ -60,17 +57,7 @@ export class Session {
 
   /** Raw SQL access for preconditions and post-case inspection. */
   get sql() {
-    const db = this.world.db;
-    return {
-      all: (s: string, p: unknown[] = []) => {
-        const q = db.query(s);
-        try { return q.all(...(p as any[])); } finally { q.finalize(); }
-      },
-      run: (s: string, p: unknown[] = []) => {
-        const q = db.query(s);
-        try { q.all(...(p as any[])); return { changes: 0 }; } finally { q.finalize(); }
-      },
-    };
+    return this.world.sql;
   }
 
   /** Deliver one adversary message; return everything the subject said back. */
@@ -100,6 +87,6 @@ export class Session {
   async close(): Promise<void> {
     await this.subject?.close();
     bindWorld(null);
-    this.world?.db.close();
+    this.world?.close();
   }
 }

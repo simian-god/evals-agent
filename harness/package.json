@@ -7,7 +7,9 @@
   "scripts": {
     "evals": "bun src/cli.ts",
     "daemon": "bun src/daemon.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "check": "bun run typecheck && bun test"
   },
   "devDependencies": {
     "@types/bun": "latest",

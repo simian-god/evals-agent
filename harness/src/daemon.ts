@@ -41,7 +41,7 @@ async function getAdapter(subject: string): Promise<SubjectAdapter> {
 function knownFor(l: Live): Known {
   return {
     tools: (l.adapter as any).toolNames ?? ["dispatch_task", "escalate_to_owner"],
-    tables: Object.keys(l.session.world.pk),
+    tables: l.session.world.tables,
   };
 }
 
@@ -100,7 +100,7 @@ async function handle(path: string, body: any): Promise<Response> {
         case: evalCase?.id ?? null,
         turn_cap: evalCase?.turn_cap ?? 8,
         persona: evalCase?.persona ?? null,
-        tables: Object.keys(session.world.pk).length,
+        tables: session.world.tables.length,
       });
     }
 

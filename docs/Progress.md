@@ -5,7 +5,7 @@ Where the work in `Plan.md` has got to. One row per task.
 Statuses: `todo`, `doing`, `done`, `blocked`. A milestone check row is done only
 when every item in that milestone's "Done when" passes.
 
-**Next task:** T1.1
+**Next task:** T1.2
 
 ## Before this plan
 
@@ -18,7 +18,7 @@ wired subject.
 
 | Task | What | Status | Date | Note |
 |---|---|---|---|---|
-| T1.1 | A `World` seam behind `Session.start`, SQLite moved behind it | todo | | |
+| T1.1 | A `World` seam behind `Session.start`, SQLite moved behind it | done | 2026-10-20 | EvalWorld in world/index.ts: seedClient, recordingClient, sql, tables, limits, close. The SQLite world moved behind it with no behaviour change. First tests in this repository, 19 of them, over the seam and over a whole session driven by a fake subject that needs no model. limits() now states WORLD-4 and WORLD-6 out loud so a report can carry them. |
 | T1.2 | The Postgres world: throwaway database, schema applied unchanged, reset between cases | todo | | |
 | T1.3 | Seeding through a real client | todo | | |
 | T1.4 | The recording proxy around a real supabase-js client | todo | | |
