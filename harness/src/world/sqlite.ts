@@ -96,7 +96,6 @@ export function openSqliteWorld(options: {
      */
     limits: () => [
       "RLS, triggers and pgvector are not enforced",
-      "a sequence column has no sequence, so any order that uses one is undefined",
       "database errors carry no SQLSTATE, so a duplicate cannot be told from a failure by code",
       ...world.translation.skipped.map((s) => `skipped: ${s.kind}`),
     ],

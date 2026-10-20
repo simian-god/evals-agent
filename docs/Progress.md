@@ -34,6 +34,7 @@ Added after T1.1, at the builder's request.
 | T1.6 | A subject chooses its world; SQLite stays the default | todo | | |
 | T1.7 | One subject's suite run both ways, and the two agree | todo | | |
 | T1.8 | PostgREST in CI, so the recording client's tests run there instead of skipping | todo | | |
+| T1.9 | Sequence columns in the SQLite world | done | 2026-10-20 | A trigger per serial column, placed with its table so a backfill further down the migration is numbered too. Covers the subject's writes, its seed script and raw SQL, which patching one insert path would not. Also found by running openbox's real migrations through the translator: `insert ... select ... on conflict` made the whole schema fail to build, and now gets the `where` SQLite's parser needs. openbox's ten tables build in the translated world and its messages, inbox and events all number in order. |
 | M1 check | An openbox-agent subject runs green in the Postgres world, no ported RPCs, no module mocking, WORLD-6's gaps gone | todo | | |
 
 ## M2. Write down what exists

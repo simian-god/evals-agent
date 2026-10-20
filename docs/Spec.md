@@ -168,7 +168,15 @@ every time it is run.
 **WORLD-4.** The translation's gaps are known and recorded rather than hidden:
 RLS, triggers and pgvector are not enforced.
 
-**WORLD-5.** A Postgres function the subject calls through an RPC has no SQLite
+**WORLD-5.** A `serial` column is filled by the world, with a trigger. Postgres means
+"the database assigns the next number"; SQLite fills no column that is not the primary
+key, so without this every one stayed NULL and any order resting on one was undefined. A
+trigger covers every way a row arrives: the subject's writes, its seed script, and raw SQL
+in a precondition. It is `max + 1` rather than a true sequence, so a number can be handed
+out twice after a delete, which does not matter inside a case that starts from a fresh
+world. A number the caller supplies is kept.
+
+**WORLD-8.** A Postgres function the subject calls through an RPC has no SQLite
 equivalent, so the adapter supplies a TypeScript port (ADAPT-1, ADAPT-5).
 
 ### What a SQLite world cannot be asked to do

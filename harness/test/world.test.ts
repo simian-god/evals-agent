@@ -13,6 +13,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openSqliteWorld } from "../src/world/sqlite.ts";
+import { upsertFromSelect } from "../src/world/translate.ts";
 import type { EvalWorld } from "../src/world/index.ts";
 import type { Effect } from "../src/types.ts";
 
@@ -153,17 +154,44 @@ test("WORLD-2: a conditional update returns the rows it changed", async () => {
   expect(lost.data).toHaveLength(0);
 });
 
-test("WORLD-6: a sequence column has no sequence here, and the world says so", async () => {
-  // Not a bug in a subject. `bigserial` has no SQLite form, so the column
-  // exists and nothing fills it, and any order that uses it is undefined.
-  // This is what the Postgres world is for (Spec section 7).
+test("WORLD-5: a sequence column counts, because the world counts for itself", async () => {
+  // `bigserial` has no SQLite form, and SQLite will not fill a column that
+  // is not the primary key, so this used to come back null and any order
+  // that used it was undefined. The world now counts with a trigger, which
+  // covers every way a row can arrive rather than one insert path.
   const built = world();
 
   await built.sql.run("insert into ob_messages (id, agent_id, body) values ('m1','restaurant','first')");
   await built.sql.run("insert into ob_messages (id, agent_id, body) values ('m2','restaurant','second')");
+  await built.sql.run("insert into ob_messages (id, agent_id, body) values ('m3','restaurant','third')");
 
-  expect(await built.sql.all("select seq from ob_messages")).toEqual([{ seq: null }, { seq: null }]);
-  expect(built.limits().join(" ")).toContain("sequence");
+  expect(await built.sql.all("select body, seq from ob_messages order by seq")).toEqual([
+    { body: "first", seq: 1 },
+    { body: "second", seq: 2 },
+    { body: "third", seq: 3 },
+  ]);
+});
+
+test("WORLD-5: the subject's own seed code gets numbers too", async () => {
+  // A trigger covers the seed path, which an insert-path patch would have
+  // missed: a case's fixture is written by the subject's seed code.
+  const built = world();
+  const pg = built.seedClient() as (
+    strings: TemplateStringsArray,
+    ...vals: unknown[]
+  ) => Promise<unknown>;
+
+  await pg`insert into ob_messages (agent_id, body) values (${"restaurant"}, ${"seeded"})`;
+
+  expect(await built.sql.all("select seq from ob_messages")).toEqual([{ seq: 1 }]);
+});
+
+test("WORLD-5: a number the caller supplies is kept, not overwritten", async () => {
+  const built = world();
+
+  await built.sql.run("insert into ob_messages (id, agent_id, body, seq) values ('m1','a','x',42)");
+
+  expect(await built.sql.all("select seq from ob_messages")).toEqual([{ seq: 42 }]);
 });
 
 test("WORLD-6: a duplicate carries no SQLSTATE here, and the world says so", async () => {
@@ -205,6 +233,60 @@ test("the world closes cleanly, and twice is not an error", async () => {
   const built = openSqliteWorld({ schemaFiles: [schemaFile], schemaPath, rebuild: true });
   await built.close();
   await built.close();
+});
+
+test("WORLD-2: a backfill that upserts from a select survives translation", async () => {
+  // Valid Postgres that SQLite rejects for a parser reason: it cannot tell
+  // an ON CONFLICT clause from the ON of a join. A real migration does this
+  // to give existing rows a default, and before the rewrite the whole
+  // schema failed to build rather than one statement failing.
+  const backfill = join(dir, "backfill.sql");
+  writeFileSync(
+    backfill,
+    `
+    create table if not exists seats (
+      id       uuid primary key default gen_random_uuid(),
+      agent_id text not null,
+      label    text,
+      unique (agent_id, label)
+    );
+    insert into seats (agent_id, label) values ('restaurant', 'window');
+    create table if not exists seat_notes (
+      id       uuid primary key default gen_random_uuid(),
+      seq      bigserial,
+      agent_id text not null,
+      label    text
+    );
+    insert into seat_notes (agent_id, label)
+    select agent_id, label from seats
+    on conflict do nothing;
+    `,
+    "utf8",
+  );
+
+  const built = openSqliteWorld({
+    schemaFiles: [backfill],
+    schemaPath: join(dir, "backfill.world.sql"),
+    rebuild: true,
+  });
+  open.push(built);
+
+  // The backfill ran, and the row it inserted was numbered.
+  expect(await built.sql.all("select label, seq from seat_notes")).toEqual([
+    { label: "window", seq: 1 },
+  ]);
+});
+
+test("the upsert rewrite leaves a real condition alone", () => {
+  expect(upsertFromSelect("insert into t select a from b on conflict do nothing")).toContain(
+    "where true on conflict",
+  );
+  // A select with its own where needs no help, and must not be rewritten.
+  const own = "insert into t select a from b where a > 1 on conflict do nothing";
+  expect(upsertFromSelect(own)).toBe(own);
+  // Nothing to do when there is no upsert at all.
+  const plain = "insert into t (a) values (1)";
+  expect(upsertFromSelect(plain)).toBe(plain);
 });
 
 test("teardown", () => {
