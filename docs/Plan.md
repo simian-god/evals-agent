@@ -22,6 +22,17 @@ subject is wired up. The gap this plan closes is narrower than it looks:
 
 Each one ships something usable on its own.
 
+### M0. CI
+
+Added after T1.1, at the builder's request. The nineteen tests T1.1 brought
+should run on every push rather than when somebody remembers.
+
+| Task | What | Spec IDs |
+|---|---|---|
+| T0.1 | Typecheck and tests on Linux and Windows, a scan proving nothing of the builder's is tracked, and a secret scan over the full history | SHAPE-3 |
+
+**Done when:** CI is green, and a commit that tracked a subject file would fail it.
+
 ### M1. The Postgres world
 
 Spec section 7. A subject with a Postgres of its own evaluates against a real

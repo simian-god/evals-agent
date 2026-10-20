@@ -5,7 +5,7 @@ Where the work in `Plan.md` has got to. One row per task.
 Statuses: `todo`, `doing`, `done`, `blocked`. A milestone check row is done only
 when every item in that milestone's "Done when" passes.
 
-**Next task:** T1.2
+**Next task:** T0.1, then T1.2
 
 ## Before this plan
 
@@ -13,6 +13,14 @@ Built and working, documented in `Spec.md` sections 1 to 6: the harness, the
 skill's pipeline, the assertion engine, the personas, the archetype risk
 libraries, the report, the regression diff, the daemon, the SQLite world, and one
 wired subject.
+
+## M0. CI
+
+Added after T1.1, at the builder's request.
+
+| Task | What | Status | Date | Note |
+|---|---|---|---|---|
+| T0.1 | Typecheck and tests on Linux and Windows, a privacy scan, a secret scan | doing | | |
 
 ## M1. The Postgres world
 

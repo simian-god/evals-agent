@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  # Windows is in the matrix because the evaluator runs inside whichever CLI
+  # the builder uses, on whichever machine they have, and the harness reads
+  # and writes paths on both.
+  check:
+    name: check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: harness
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Tests
+        run: bun test
+
+  # The subject directory is the builder's, and the whole promise of this
+  # repository is that it never publishes their agents or their data. A
+  # workflow is the only thing that keeps checking after the first time
+  # somebody is in a hurry.
+  privacy:
+    name: nothing of the builder's is tracked
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No subject is committed
+        run: |
+          tracked=$(git ls-files 'subjects/*' | grep -v '^subjects/README.md$' || true)
+          if [ -n "$tracked" ]; then
+            echo "These are tracked and should not be:"
+            echo "$tracked"
+            exit 1
+          fi
+          echo "subjects/ holds nothing but its README."
+
+      - name: No run artifacts are committed
+        run: |
+          tracked=$(git ls-files | grep -E '(^|/)(runs|authoring)/|\.events\.jsonl$|\.transcript\.md$' || true)
+          if [ -n "$tracked" ]; then
+            echo "These are tracked and should not be:"
+            echo "$tracked"
+            exit 1
+          fi
+          echo "No transcripts, events or authoring exports are tracked."
+
+  # Adapters hold the environment a subject runs under, and a subject's .env
+  # sits next to it. Over the full history, because a key removed in a later
+  # commit is still published by the earlier one.
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          sudo install -m 755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan the working tree
+        run: gitleaks dir . --redact --verbose
+
+      - name: Scan the history
+        run: gitleaks git . --redact --verbose
