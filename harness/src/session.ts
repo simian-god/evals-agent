@@ -87,6 +87,6 @@ export class Session {
   async close(): Promise<void> {
     await this.subject?.close();
     bindWorld(null);
-    this.world?.close();
+    await this.world?.close();
   }
 }

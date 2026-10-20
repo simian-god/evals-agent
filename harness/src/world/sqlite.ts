@@ -101,6 +101,6 @@ export function openSqliteWorld(options: {
       ...world.translation.skipped.map((s) => `skipped: ${s.kind}`),
     ],
 
-    close: () => world.db.close(),
+    close: async () => world.db.close(),
   };
 }

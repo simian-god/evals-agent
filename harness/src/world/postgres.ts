@@ -15,7 +15,9 @@
 // do damage, so it must only ever be able to damage something disposable
 // (Spec PGW-5).
 import { SQL } from "bun";
+import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
+import { recordingClient as watch } from "../capture/postgrest.ts";
 import type { AsyncSqlRunner, DbLike, EvalWorld, RecordingOptions } from "./index.ts";
 
 /** Where the throwaway database is, when nothing says otherwise. */
@@ -23,6 +25,17 @@ export const DEFAULT_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postg
 
 export function databaseUrl(env: Record<string, string | undefined> = process.env): string {
   return env["EVALS_DATABASE_URL"] ?? env["DATABASE_URL"] ?? DEFAULT_URL;
+}
+
+/** Where PostgREST is, which is what the subject's own client talks to. */
+export const DEFAULT_REST_URL = "http://127.0.0.1:54321";
+
+export function restUrl(env: Record<string, string | undefined> = process.env): string {
+  return env["EVALS_SUPABASE_URL"] ?? env["SUPABASE_URL"] ?? DEFAULT_REST_URL;
+}
+
+export function serviceKey(env: Record<string, string | undefined> = process.env): string {
+  return env["EVALS_SUPABASE_SERVICE_ROLE_KEY"] ?? env["SUPABASE_SERVICE_ROLE_KEY"] ?? "";
 }
 
 /** True when something is listening. Lets a suite skip rather than fail. */
@@ -56,6 +69,18 @@ export interface PostgresWorldOptions {
   /** The subject's schema sources, in apply order. Applied unchanged. */
   schemaFiles: string[];
   url?: string | undefined;
+  /** Where PostgREST is, for the client the subject is handed. */
+  rest?: { url: string; serviceKey: string } | undefined;
+  /**
+   * An open connection to borrow instead of making one.
+   *
+   * A borrowed connection is never closed by the world, because it is not
+   * the world's to close. This exists because Bun 1.4.0 segfaults under the
+   * churn of Postgres pools opened and dropped, and a suite opens one world
+   * per case. openbox-agent hit the same bug and its migrate takes a
+   * connection for the same reason.
+   */
+  sql?: SQL | undefined;
   /** Re-apply the schema even when the world already has it. */
   rebuild?: boolean | undefined;
   /**
@@ -73,7 +98,11 @@ export interface PostgresWorldOptions {
 export async function openPostgresWorld(options: PostgresWorldOptions): Promise<EvalWorld> {
   const url = options.url ?? databaseUrl();
   const disposable = options.disposable ?? process.env["EVALS_WORLD_DISPOSABLE"] === "1";
-  const sql = new SQL({ url, max: 4 });
+  // One connection, and borrowed when the caller has one. Everything a
+  // world does is sequential, so one is enough, and Bun 1.4.0 segfaults
+  // under the churn of pools opened and dropped.
+  const borrowed = options.sql !== undefined;
+  const sql = options.sql ?? new SQL({ url, max: 1 });
 
   const tableNames = async (): Promise<string[]> => {
     const rows = (await sql`
@@ -121,6 +150,12 @@ export async function openPostgresWorld(options: PostgresWorldOptions): Promise<
       await sql.unsafe(readFileSync(path, "utf8"));
     }
     await sql.unsafe(`create table if not exists ${MARKER_TABLE} (built_at timestamptz not null default now())`);
+
+    // PostgREST reads the schema once and caches it. Without this, the
+    // client the subject is handed insists the tables do not exist, which
+    // looks like a subject bug and is not one.
+    await sql.unsafe("notify pgrst, 'reload schema'");
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
   };
 
   /** Empty, not rebuilt: a case needs a clean world, not a new schema. */
@@ -156,7 +191,7 @@ export async function openPostgresWorld(options: PostgresWorldOptions): Promise<
     }
     await empty();
   } catch (error) {
-    await sql.close().catch(() => {});
+    if (!borrowed) await sql.close().catch(() => {});
     throw error;
   }
 
@@ -185,8 +220,22 @@ export async function openPostgresWorld(options: PostgresWorldOptions): Promise<
      */
     seedClient: () => sql,
 
-    recordingClient: (_recording: RecordingOptions): DbLike => {
-      throw new Error("[evals] the Postgres world's recording client is T1.4, not built yet");
+    /**
+     * The subject's real client, watched (Spec PGW-4).
+     *
+     * `rpcs` is ignored, and that is the point: a Postgres function here is
+     * the real one, so there is nothing for an adapter to port (PGW-3).
+     */
+    recordingClient: (recording: RecordingOptions): DbLike => {
+      const rest = options.rest ?? { url: restUrl(), serviceKey: serviceKey() };
+      if (rest.serviceKey === "") {
+        throw new Error(
+          "[evals] the Postgres world needs a service role key for the client the subject is " +
+            "handed. Set EVALS_SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_SERVICE_ROLE_KEY.",
+        );
+      }
+      const real = createClient(rest.url, rest.serviceKey, { auth: { persistSession: false } });
+      return watch(real, recording.emit);
     },
 
     /**
@@ -200,8 +249,9 @@ export async function openPostgresWorld(options: PostgresWorldOptions): Promise<
     /** For a test or a report that wants to know what this world owns. */
     owns: () => [...ours].sort(),
 
-    close: () => {
-      void sql.close();
+    close: async () => {
+      // A borrowed connection outlives the world that used it.
+      if (!borrowed) await sql.close();
     },
   };
 }

@@ -55,5 +55,12 @@ export interface EvalWorld {
   limits(): string[];
   /** The tables this world may drop or empty. Everything else is left alone. */
   owns?(): string[];
-  close(): void;
+  /**
+   * Awaited, always.
+   *
+   * A Postgres world holds a connection, and Bun 1.4.0 crashes under the
+   * churn of pools opened and dropped without being closed first. A suite
+   * opens one world per case, so that churn is the normal case.
+   */
+  close(): Promise<void>;
 }

@@ -48,8 +48,8 @@ beforeAll(() => {
   writeFileSync(schemaFile, SCHEMA, "utf8");
 });
 
-afterEach(() => {
-  for (const world of open.splice(0)) world.close();
+afterEach(async () => {
+  for (const world of open.splice(0)) await world.close();
 });
 
 function world(): EvalWorld {
@@ -201,10 +201,10 @@ test("WORLD-3: each case gets its own world", async () => {
   expect(await second.sql.all("select count(*) as n from ob_people")).toEqual([{ n: 0 }]);
 });
 
-test("the world closes cleanly, and twice is not an error", () => {
+test("the world closes cleanly, and twice is not an error", async () => {
   const built = openSqliteWorld({ schemaFiles: [schemaFile], schemaPath, rebuild: true });
-  built.close();
-  expect(() => built.close()).not.toThrow();
+  await built.close();
+  await built.close();
 });
 
 test("teardown", () => {

@@ -34,6 +34,46 @@ jobs:
       - name: Tests
         run: bun test
 
+  # The Postgres world (Spec section 7) against a real Postgres, so its
+  # tests run instead of skipping. They are the ones that prove a sequence
+  # counts and a duplicate carries a SQLSTATE, which is the whole reason
+  # that world exists.
+  #
+  # PostgREST is not here, so the tests for the recording client skip: they
+  # need the client the subject actually talks to. That gap has a task.
+  postgres:
+    name: the Postgres world
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["54322:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: harness
+    env:
+      EVALS_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      # The database is created by this job and thrown away with it.
+      EVALS_WORLD_DISPOSABLE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Tests
+        run: bun test
+
   # The subject directory is the builder's, and the whole promise of this
   # repository is that it never publishes their agents or their data. A
   # workflow is the only thing that keeps checking after the first time

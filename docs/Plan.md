@@ -47,6 +47,7 @@ one, so there is nothing to translate and nothing to be missing.
 | T1.5 | Async raw SQL for preconditions and post case inspection. Done with T1.2: a Postgres world cannot have a synchronous one, so it was a prerequisite rather than a follow up | PGW-7 |
 | T1.6 | A subject chooses its world, and the SQLite one stays the default | PGW-6 |
 | T1.7 | The same suite run both ways on one subject, and the two agree | PGW-4 |
+| T1.8 | PostgREST in CI, so the recording client's tests run there instead of skipping | PGW-4 |
 | M1 check | An openbox-agent subject runs green in the Postgres world, with no ported RPCs and no module mocking, and WORLD-6's three gaps are gone | PGW-1 to PGW-7 |
 
 **Done when:** a suite that cannot pass in the SQLite world because of
@@ -106,6 +107,7 @@ layer findings can be opened as openbox-agent tasks without rewriting.
 |---|---|---|
 | The recording proxy cannot emit the same Effects for PostgREST's embedded selects, `or()` and count queries | Medium | T1.4 checks those three first. If one cannot be recorded faithfully, it is reported as a limit rather than approximated. |
 | Per case truncate is too slow at suite scale | Low | A suite case is dominated by model latency, not by the database. Measured in T1.7; a schema per case is the fallback. |
+| Bun 1.4.0 crashes once a process holds enough Postgres connections at once | Certain, and hit | Every world uses a pool of one, because everything a world does is sequential. openbox-agent hit the same thing and worked around it the same way. Worth knowing before a suite is made to run cases in parallel. |
 | Two worlds is more to maintain than one | Certain | Accepted, because removing the SQLite one would cost the zero setup promise. The seam in T1.1 is the thing that keeps the cost down. |
 | A subject passes in one world and fails in the other | Medium | That is the finding, not the failure. T1.7 exists to surface it. |
 | Documenting what exists uncovers behaviour nobody intended | Medium | Expected. M2 records what the code does, and anything that looks wrong becomes a task rather than a quiet fix. |

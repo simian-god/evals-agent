@@ -5,7 +5,7 @@ Where the work in `Plan.md` has got to. One row per task.
 Statuses: `todo`, `doing`, `done`, `blocked`. A milestone check row is done only
 when every item in that milestone's "Done when" passes.
 
-**Next task:** T1.4
+**Next task:** T1.6
 
 ## Before this plan
 
@@ -29,10 +29,11 @@ Added after T1.1, at the builder's request.
 | T1.1 | A `World` seam behind `Session.start`, SQLite moved behind it | done | 2026-10-20 | EvalWorld in world/index.ts: seedClient, recordingClient, sql, tables, limits, close. The SQLite world moved behind it with no behaviour change. First tests in this repository, 19 of them, over the seam and over a whole session driven by a fake subject that needs no model. limits() now states WORLD-4 and WORLD-6 out loud so a report can carry them. |
 | T1.2 | The Postgres world: throwaway database, schema applied unchanged, reset between cases | done | 2026-10-20 | The subject's schema applied unchanged to a real Postgres, seeded through a real client, emptied between cases. A sequence counts and a duplicate carries a SQLSTATE, which are WORLD-6 inverted. Two guards came out of building it: the harness refuses a database whose subject tables it did not build unless told it is disposable, and every drop or truncate is scoped to the subject's own declared tables, because the first version wrecked a neighbouring project's tables in a shared development database. |
 | T1.3 | Seeding through a real client | done | 2026-10-20 | Done inside T1.2: seedClient returns the real Bun.SQL client, which is the thing seed(pg) was always shaped for. Proven by the ADAPT-4 test in postgres-world.test.ts. |
-| T1.4 | The recording proxy around a real supabase-js client | todo | | |
+| T1.4 | The recording proxy around a real supabase-js client | done | 2026-10-20 | The subject gets the real client and the harness only watches, so embedded selects, or() filters, counts and error codes are whatever PostgREST does. 11 tests: a real 23505 reaches the subject, an embed works without one level of re-implementation, a conditional claim returns what it changed, and an rpc runs with nothing ported (PGW-3). A query the recorder knows nothing about still works and is still recorded, which is the argument for wrapping rather than re-implementing. A world can borrow a connection, because Bun segfaults under pool churn and a suite opens one world per case. |
 | T1.5 | Async raw SQL for preconditions and inspection | done | 2026-10-20 | Done with T1.2 rather than after it: a Postgres world cannot have a synchronous sql, so this was a prerequisite and not a follow up. The SQLite world wraps its synchronous answers, so nothing is slower for it. |
 | T1.6 | A subject chooses its world; SQLite stays the default | todo | | |
 | T1.7 | One subject's suite run both ways, and the two agree | todo | | |
+| T1.8 | PostgREST in CI, so the recording client's tests run there instead of skipping | todo | | |
 | M1 check | An openbox-agent subject runs green in the Postgres world, no ported RPCs, no module mocking, WORLD-6's gaps gone | todo | | |
 
 ## M2. Write down what exists

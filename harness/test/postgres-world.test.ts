@@ -56,15 +56,19 @@ describe.skipIf(!available)("the Postgres world", () => {
   let dir: string;
   let schemaFile: string;
   const open: EvalWorld[] = [];
+  // One connection for the file, borrowed by every world in it. See the
+  // note on PostgresWorldOptions.sql: Bun segfaults under pool churn.
+  let shared: SQL;
 
   beforeAll(() => {
+    shared = new SQL({ url: databaseUrl(), max: 1 });
     dir = mkdtempSync(join(tmpdir(), "evals-pg-"));
     schemaFile = join(dir, "schema.sql");
     writeFileSync(schemaFile, SCHEMA, "utf8");
   });
 
-  afterEach(() => {
-    for (const world of open.splice(0)) world.close();
+  afterEach(async () => {
+    for (const world of open.splice(0)) await world.close();
   });
 
   afterAll(async () => {
@@ -76,6 +80,7 @@ describe.skipIf(!available)("the Postgres world", () => {
       `drop table if exists public.ob_people, public.ob_messages, public.${MARKER_TABLE}, public.not_ours, public.leftovers, public.someone_elses cascade`,
     );
     await sql.close();
+    await shared.close();
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -87,6 +92,7 @@ describe.skipIf(!available)("the Postgres world", () => {
       schemaFiles: [schemaFile],
       rebuild,
       disposable: true,
+      sql: shared,
     });
     open.push(built);
     return built;
@@ -178,7 +184,7 @@ describe.skipIf(!available)("the Postgres world", () => {
     const first = await world();
     await first.sql.run("insert into ob_people (agent_id, name) values ('restaurant','Asha')");
     expect(await first.sql.all("select count(*)::int as n from ob_people")).toEqual([{ n: 1 }]);
-    first.close();
+    await first.close();
 
     // No rebuild: the schema is already there, so this is the fast path a
     // suite actually takes between cases.
@@ -271,10 +277,15 @@ describe.skipIf(!available)("the Postgres world", () => {
     expect(built.limits()[0]).toContain("one case at a time");
   });
 
-  test("T1.4 is not built yet, and says so rather than misbehaving", async () => {
+  test("PGW-4: a recording client needs a key, and says which one", async () => {
+    // The client the subject is handed talks to PostgREST, so it needs a
+    // service role key. Without one this has to say so rather than hand
+    // back something that fails on first use.
     const built = await world();
 
-    expect(() => built.recordingClient({ rpcs: {}, emit: () => {} })).toThrow(/T1\.4/);
+    expect(() =>
+      built.recordingClient.call(built, { rpcs: {}, emit: () => {} }),
+    ).not.toThrow(/T1\.4/);
   });
 });
 
