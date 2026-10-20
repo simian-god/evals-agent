@@ -82,12 +82,12 @@ async function handle(path: string, body: any): Promise<Response> {
         // rename a department so an ilike lookup misses) or `{table, ...cols}`
         // (insert a row, e.g. a second room with another guest's order).
         if ((row as any).sql) {
-          session.sql.run(String((row as any).sql));
+          await session.sql.run(String((row as any).sql));
           continue;
         }
         const { table, ...cols } = row as any;
         const keys = Object.keys(cols);
-        session.sql.run(
+        await session.sql.run(
           `insert into "${table}" (${keys.map((k) => `"${k}"`).join(",")}) values (${keys.map(() => "?").join(",")})`,
           keys.map((k) => (typeof cols[k] === "object" ? JSON.stringify(cols[k]) : cols[k])),
         );
@@ -134,7 +134,7 @@ async function handle(path: string, body: any): Promise<Response> {
     case "/sql": {
       const l = live.get(body.session);
       if (!l) return json({ error: "no such session" }, 404);
-      return json({ rows: l.session.sql.all(String(body.query), body.params ?? []) });
+      return json({ rows: await l.session.sql.all(String(body.query), body.params ?? []) });
     }
 
     case "/grade": {

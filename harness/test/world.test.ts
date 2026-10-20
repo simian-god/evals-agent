@@ -73,15 +73,15 @@ test("WORLD-1: the world is built from the subject's own schema", () => {
   expect(built.tables.sort()).toEqual(["ob_messages", "ob_people"]);
 });
 
-test("WORLD-1: raw SQL reads and writes the world", () => {
+test("WORLD-1: raw SQL reads and writes the world", async () => {
   const built = world();
 
-  built.sql.run("insert into ob_people (id, agent_id, name) values (?, ?, ?)", [
+  await built.sql.run("insert into ob_people (id, agent_id, name) values (?, ?, ?)", [
     "p1",
     "restaurant",
     "Asha",
   ]);
-  expect(built.sql.all("select name from ob_people")).toEqual([{ name: "Asha" }]);
+  expect(await built.sql.all("select name from ob_people")).toEqual([{ name: "Asha" }]);
 });
 
 test("ADAPT-4: the subject's own seed code can seed it", async () => {
@@ -94,7 +94,7 @@ test("ADAPT-4: the subject's own seed code can seed it", async () => {
   // Written the way a subject's seed script writes it.
   await pg`insert into ob_people (agent_id, name) values (${"restaurant"}, ${"Asha"})`;
 
-  expect(built.sql.all("select agent_id, name from ob_people")).toEqual([
+  expect(await built.sql.all("select agent_id, name from ob_people")).toEqual([
     { agent_id: "restaurant", name: "Asha" },
   ]);
 });
@@ -104,7 +104,7 @@ test("EFF-1: a read through the recording client becomes an Effect", async () =>
   const seen = recorder();
   const db = built.recordingClient(seen.options);
 
-  built.sql.run("insert into ob_people (id, agent_id, name) values ('p1','restaurant','Asha')");
+  await built.sql.run("insert into ob_people (id, agent_id, name) values ('p1','restaurant','Asha')");
   const out = await db.from("ob_people").select("*").eq("agent_id", "restaurant");
 
   expect(out.error).toBeNull();
@@ -134,7 +134,7 @@ test("WORLD-2: a conditional update returns the rows it changed", async () => {
   const built = world();
   const db = built.recordingClient(recorder().options);
 
-  built.sql.run("insert into ob_people (id, agent_id, name) values ('p1','restaurant','free')");
+  await built.sql.run("insert into ob_people (id, agent_id, name) values ('p1','restaurant','free')");
 
   const won = await db
     .from("ob_people")
@@ -153,16 +153,16 @@ test("WORLD-2: a conditional update returns the rows it changed", async () => {
   expect(lost.data).toHaveLength(0);
 });
 
-test("WORLD-6: a sequence column has no sequence here, and the world says so", () => {
+test("WORLD-6: a sequence column has no sequence here, and the world says so", async () => {
   // Not a bug in a subject. `bigserial` has no SQLite form, so the column
   // exists and nothing fills it, and any order that uses it is undefined.
   // This is what the Postgres world is for (Spec section 7).
   const built = world();
 
-  built.sql.run("insert into ob_messages (id, agent_id, body) values ('m1','restaurant','first')");
-  built.sql.run("insert into ob_messages (id, agent_id, body) values ('m2','restaurant','second')");
+  await built.sql.run("insert into ob_messages (id, agent_id, body) values ('m1','restaurant','first')");
+  await built.sql.run("insert into ob_messages (id, agent_id, body) values ('m2','restaurant','second')");
 
-  expect(built.sql.all("select seq from ob_messages")).toEqual([{ seq: null }, { seq: null }]);
+  expect(await built.sql.all("select seq from ob_messages")).toEqual([{ seq: null }, { seq: null }]);
   expect(built.limits().join(" ")).toContain("sequence");
 });
 
@@ -192,13 +192,13 @@ test("WORLD-4: what the translation skipped is reported, not hidden", () => {
   expect(built.limits().join(" ")).toContain("RLS");
 });
 
-test("WORLD-3: each case gets its own world", () => {
+test("WORLD-3: each case gets its own world", async () => {
   const first = world();
-  first.sql.run("insert into ob_people (id, agent_id, name) values ('p1','restaurant','Asha')");
-  expect(first.sql.all("select count(*) as n from ob_people")).toEqual([{ n: 1 }]);
+  await first.sql.run("insert into ob_people (id, agent_id, name) values ('p1','restaurant','Asha')");
+  expect(await first.sql.all("select count(*) as n from ob_people")).toEqual([{ n: 1 }]);
 
   const second = world();
-  expect(second.sql.all("select count(*) as n from ob_people")).toEqual([{ n: 0 }]);
+  expect(await second.sql.all("select count(*) as n from ob_people")).toEqual([{ n: 0 }]);
 });
 
 test("the world closes cleanly, and twice is not an error", () => {

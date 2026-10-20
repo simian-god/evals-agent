@@ -5,7 +5,7 @@ Where the work in `Plan.md` has got to. One row per task.
 Statuses: `todo`, `doing`, `done`, `blocked`. A milestone check row is done only
 when every item in that milestone's "Done when" passes.
 
-**Next task:** T0.1, then T1.2
+**Next task:** T1.3
 
 ## Before this plan
 
@@ -20,17 +20,17 @@ Added after T1.1, at the builder's request.
 
 | Task | What | Status | Date | Note |
 |---|---|---|---|---|
-| T0.1 | Typecheck and tests on Linux and Windows, a privacy scan, a secret scan | doing | | |
+| T0.1 | Typecheck and tests on Linux and Windows, a privacy scan, a secret scan | done | 2026-10-20 | Four jobs, green first run. Also checks that nothing of the builder's is tracked, since a promise in a gitignore holds until somebody is in a hurry. No format check: this repository has no formatter and choosing one is not mine to do. |
 
 ## M1. The Postgres world
 
 | Task | What | Status | Date | Note |
 |---|---|---|---|---|
 | T1.1 | A `World` seam behind `Session.start`, SQLite moved behind it | done | 2026-10-20 | EvalWorld in world/index.ts: seedClient, recordingClient, sql, tables, limits, close. The SQLite world moved behind it with no behaviour change. First tests in this repository, 19 of them, over the seam and over a whole session driven by a fake subject that needs no model. limits() now states WORLD-4 and WORLD-6 out loud so a report can carry them. |
-| T1.2 | The Postgres world: throwaway database, schema applied unchanged, reset between cases | todo | | |
+| T1.2 | The Postgres world: throwaway database, schema applied unchanged, reset between cases | done | 2026-10-20 | The subject's schema applied unchanged to a real Postgres, seeded through a real client, emptied between cases. A sequence counts and a duplicate carries a SQLSTATE, which are WORLD-6 inverted. Two guards came out of building it: the harness refuses a database whose subject tables it did not build unless told it is disposable, and every drop or truncate is scoped to the subject's own declared tables, because the first version wrecked a neighbouring project's tables in a shared development database. |
 | T1.3 | Seeding through a real client | todo | | |
 | T1.4 | The recording proxy around a real supabase-js client | todo | | |
-| T1.5 | Async raw SQL for preconditions and inspection | todo | | |
+| T1.5 | Async raw SQL for preconditions and inspection | done | 2026-10-20 | Done with T1.2 rather than after it: a Postgres world cannot have a synchronous sql, so this was a prerequisite and not a follow up. The SQLite world wraps its synchronous answers, so nothing is slower for it. |
 | T1.6 | A subject chooses its world; SQLite stays the default | todo | | |
 | T1.7 | One subject's suite run both ways, and the two agree | todo | | |
 | M1 check | An openbox-agent subject runs green in the Postgres world, no ported RPCs, no module mocking, WORLD-6's gaps gone | todo | | |

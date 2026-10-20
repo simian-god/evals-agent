@@ -98,7 +98,7 @@ test("a session builds the world, seeds it with the subject's own code, and open
   expect(s.world.kind).toBe("sqlite");
   expect(s.world.tables).toEqual(["bookings"]);
   // The subject's seed is the fixture, not something re-typed here.
-  expect(s.sql.all("select guest from bookings")).toEqual([{ guest: "Existing" }]);
+  expect(await s.sql.all("select guest from bookings")).toEqual([{ guest: "Existing" }]);
 
   await s.close();
 });
@@ -110,7 +110,7 @@ test("ADAPT-3: the subject reaches the world through the bound proxy", async () 
   const replies = await s.say("please book a table");
 
   expect(replies).toEqual(["Booked for 4."]);
-  expect(s.sql.all("select guest from bookings order by guest")).toEqual([
+  expect(await s.sql.all("select guest from bookings order by guest")).toEqual([
     { guest: "Asha" },
     { guest: "Existing" },
   ]);
@@ -165,12 +165,12 @@ test("WORLD-3: a second session starts from the seed again, not from the last on
   const first = session({ seeded: false });
   await first.start();
   await first.say("please book a table");
-  expect(first.sql.all("select count(*) as n from bookings")).toEqual([{ n: 2 }]);
+  expect(await first.sql.all("select count(*) as n from bookings")).toEqual([{ n: 2 }]);
   await first.close();
 
   const second = session({ seeded: false });
   await second.start();
-  expect(second.sql.all("select count(*) as n from bookings")).toEqual([{ n: 1 }]);
+  expect(await second.sql.all("select count(*) as n from bookings")).toEqual([{ n: 1 }]);
   await second.close();
 });
 

@@ -11,6 +11,18 @@
 // than surgery on the first.
 import type { Effect, SqlRunner } from "../types.ts";
 
+/**
+ * Raw SQL, for preconditions and post case inspection.
+ *
+ * Async because a Postgres world has no choice: the SQLite one answers
+ * from memory, a real database answers over a socket. The SQLite world
+ * wraps its synchronous answers, so nothing is slower for it.
+ */
+export interface AsyncSqlRunner {
+  all(sql: string, params?: unknown[]): Promise<any[]>;
+  run(sql: string, params?: unknown[]): Promise<{ changes: number }>;
+}
+
 /** What the subject is handed in place of its own database client. */
 export interface DbLike {
   from(table: string): any;
@@ -38,8 +50,10 @@ export interface EvalWorld {
   /** The recording client the subject sees, which turns reads and writes into Effects. */
   recordingClient(options: RecordingOptions): DbLike;
   /** Raw SQL, for preconditions and post case inspection. */
-  readonly sql: SqlRunner;
+  readonly sql: AsyncSqlRunner;
   /** Anything the report should say about what this world could not do. */
   limits(): string[];
+  /** The tables this world may drop or empty. Everything else is left alone. */
+  owns?(): string[];
   close(): void;
 }

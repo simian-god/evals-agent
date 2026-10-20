@@ -26,7 +26,7 @@ const s = new Session({
 });
 await s.start();
 
-console.log("tables:", s.sql.all("select name from sqlite_master where type='table'").length);
+console.log("tables:", s.world.tables.length);
 if (bindRoomDirect && FIXTURE) bindRoomDirect(s.sql, FIXTURE.guestPhone);
 
 const replies = await s.say(question);

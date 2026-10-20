@@ -6,8 +6,7 @@ import { dirname } from "node:path";
 import { translate, type TranslateResult } from "./translate.ts";
 import { makePgShim } from "./pg-shim.ts";
 import { makeFakeDb } from "../capture/db.ts";
-import type { DbLike, EvalWorld, RecordingOptions } from "./index.ts";
-import type { SqlRunner } from "../types.ts";
+import type { AsyncSqlRunner, DbLike, EvalWorld, RecordingOptions } from "./index.ts";
 
 export interface World {
   db: Database;
@@ -61,8 +60,8 @@ export function openSqliteWorld(options: {
   if (options.rebuild) buildSchema(options.schemaFiles, options.schemaPath);
   const world = openWorld(options.schemaPath);
 
-  const sql: SqlRunner = {
-    all: (text: string, params: unknown[] = []) => {
+  const sql: AsyncSqlRunner = {
+    all: async (text: string, params: unknown[] = []) => {
       const q = world.db.query(text);
       try {
         return q.all(...(params as any[]));
@@ -70,7 +69,7 @@ export function openSqliteWorld(options: {
         q.finalize();
       }
     },
-    run: (text: string, params: unknown[] = []) => {
+    run: async (text: string, params: unknown[] = []) => {
       const q = world.db.query(text);
       try {
         q.all(...(params as any[]));
