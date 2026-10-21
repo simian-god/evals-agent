@@ -65,6 +65,34 @@ export async function databaseAvailable(url: string = databaseUrl()): Promise<bo
  */
 export const MARKER_TABLE = "evals_world_marker";
 
+/**
+ * One connection per database, for the whole process.
+ *
+ * A suite opens one world per case, and Bun 1.4.0 segfaults under the churn
+ * of Postgres pools opened and dropped. Everything a world does is
+ * sequential, so one connection per database is enough for all of them, and
+ * sharing it means there is no churn to crash on.
+ *
+ * `closePostgresConnections` is how a process gives them back.
+ */
+const connections = new Map<string, SQL>();
+
+export function connection(url: string = databaseUrl()): SQL {
+  const open = connections.get(url);
+  if (open) return open;
+  const made = new SQL({ url, max: 1 });
+  connections.set(url, made);
+  return made;
+}
+
+/** Closes every connection this process opened. For teardown. */
+export async function closePostgresConnections(): Promise<void> {
+  for (const [url, sql] of [...connections]) {
+    connections.delete(url);
+    await sql.close().catch(() => {});
+  }
+}
+
 export interface PostgresWorldOptions {
   /** The subject's schema sources, in apply order. Applied unchanged. */
   schemaFiles: string[];
@@ -72,13 +100,10 @@ export interface PostgresWorldOptions {
   /** Where PostgREST is, for the client the subject is handed. */
   rest?: { url: string; serviceKey: string } | undefined;
   /**
-   * An open connection to borrow instead of making one.
+   * A connection to use instead of the process's own.
    *
-   * A borrowed connection is never closed by the world, because it is not
-   * the world's to close. This exists because Bun 1.4.0 segfaults under the
-   * churn of Postgres pools opened and dropped, and a suite opens one world
-   * per case. openbox-agent hit the same bug and its migrate takes a
-   * connection for the same reason.
+   * Rarely needed: a world borrows the one this process keeps for that
+   * database by default. Never closed by the world either way.
    */
   sql?: SQL | undefined;
   /** Re-apply the schema even when the world already has it. */
@@ -98,11 +123,10 @@ export interface PostgresWorldOptions {
 export async function openPostgresWorld(options: PostgresWorldOptions): Promise<EvalWorld> {
   const url = options.url ?? databaseUrl();
   const disposable = options.disposable ?? process.env["EVALS_WORLD_DISPOSABLE"] === "1";
-  // One connection, and borrowed when the caller has one. Everything a
-  // world does is sequential, so one is enough, and Bun 1.4.0 segfaults
-  // under the churn of pools opened and dropped.
-  const borrowed = options.sql !== undefined;
-  const sql = options.sql ?? new SQL({ url, max: 1 });
+  // Borrowed, always: either the caller's connection or the one this
+  // process keeps for that database. A world never opens its own, because
+  // a suite opens one world per case and Bun segfaults under that churn.
+  const sql = options.sql ?? connection(url);
 
   const tableNames = async (): Promise<string[]> => {
     const rows = (await sql`
@@ -191,7 +215,6 @@ export async function openPostgresWorld(options: PostgresWorldOptions): Promise<
     }
     await empty();
   } catch (error) {
-    if (!borrowed) await sql.close().catch(() => {});
     throw error;
   }
 
@@ -249,9 +272,8 @@ export async function openPostgresWorld(options: PostgresWorldOptions): Promise<
     /** For a test or a report that wants to know what this world owns. */
     owns: () => [...ours].sort(),
 
-    close: async () => {
-      // A borrowed connection outlives the world that used it.
-      if (!borrowed) await sql.close();
-    },
+    // Nothing to close: the connection is the process's, not this world's,
+    // and outlives it. `closePostgresConnections` gives them back.
+    close: async () => {},
   };
 }

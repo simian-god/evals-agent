@@ -10,14 +10,15 @@ import { test, expect, describe, beforeAll, afterAll, afterEach } from "bun:test
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SQL } from "bun";
 import {
   openPostgresWorld,
+  connection,
   databaseAvailable,
   databaseUrl,
   restUrl,
   serviceKey,
   MARKER_TABLE,
+  closePostgresConnections,
 } from "../src/world/postgres.ts";
 import type { EvalWorld, DbLike } from "../src/world/index.ts";
 import type { Effect } from "../src/types.ts";
@@ -45,10 +46,10 @@ describe.skipIf(!available)("recording a real supabase-js client", () => {
   const open: EvalWorld[] = [];
   // One connection for the file, borrowed by every world in it. See the
   // note on PostgresWorldOptions.sql: Bun segfaults under pool churn.
-  let shared: SQL;
+  let shared: ReturnType<typeof connection>;
 
   beforeAll(() => {
-    shared = new SQL({ url: databaseUrl(), max: 1 });
+    shared = connection();
     dir = mkdtempSync(join(tmpdir(), "evals-capture-"));
     schemaFile = join(dir, "schema.sql");
     writeFileSync(schemaFile, SCHEMA, "utf8");
@@ -59,12 +60,11 @@ describe.skipIf(!available)("recording a real supabase-js client", () => {
   });
 
   afterAll(async () => {
-    const sql = new SQL({ url: databaseUrl(), max: 1 });
+    const sql = connection();
     await sql.unsafe(
       `drop table if exists public.bookings, public.guests, public.${MARKER_TABLE} cascade`,
     );
-    await sql.close();
-    await shared.close();
+    await closePostgresConnections();
     rmSync(dir, { recursive: true, force: true });
   });
 

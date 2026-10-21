@@ -1,4 +1,7 @@
 // Shared contracts between the harness, the adapters, and the skill.
+import type { WorldChoice } from "./world/open.ts";
+
+export type { WorldChoice };
 
 /** One observable thing the subject did. The unit every assertion speaks about. */
 export interface Effect {
@@ -26,8 +29,19 @@ export interface SubjectAdapter {
   id: string;
   /** Repo root of the subject (cwd for its env + relative imports). */
   root: string;
-  /** Schema sources, in apply order, translated into the SQLite world. */
+  /**
+   * Schema sources, in apply order.
+   *
+   * Translated into the SQLite world, and applied unchanged to a Postgres
+   * one. The subject writes them for Postgres either way.
+   */
   schemaFiles: string[];
+  /**
+   * Which world to run in. SQLite when nothing says otherwise, because it
+   * needs nothing installed. `EVALS_WORLD` overrides this, so a suite can
+   * be run both ways without editing the subject.
+   */
+  world?: WorldChoice;
   /** Files whose content decides whether an intent spec is still valid. */
   fingerprintFiles: string[];
   /** Env the subject runs under during evals. Must neutralise every real edge. */

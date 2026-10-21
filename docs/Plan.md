@@ -108,7 +108,7 @@ layer findings can be opened as openbox-agent tasks without rewriting.
 |---|---|---|
 | The recording proxy cannot emit the same Effects for PostgREST's embedded selects, `or()` and count queries | Medium | T1.4 checks those three first. If one cannot be recorded faithfully, it is reported as a limit rather than approximated. |
 | Per case truncate is too slow at suite scale | Low | A suite case is dominated by model latency, not by the database. Measured in T1.7; a schema per case is the fallback. |
-| Bun 1.4.0 crashes once a process holds enough Postgres connections at once | Certain, and hit | Every world uses a pool of one, because everything a world does is sequential. openbox-agent hit the same thing and worked around it the same way. Worth knowing before a suite is made to run cases in parallel. |
+| Bun 1.4.0 crashes once a process holds enough Postgres connections at once | Certain, and hit three times | One connection per database for the whole process, cached, borrowed by every world and by the tests. A world opens none of its own and closes none. Four connections in one process was enough to segfault. Worth knowing before a suite is made to run cases in parallel, and before anyone adds a `new SQL` anywhere. |
 | Two worlds is more to maintain than one | Certain | Accepted, because removing the SQLite one would cost the zero setup promise. The seam in T1.1 is the thing that keeps the cost down. |
 | A subject passes in one world and fails in the other | Medium | That is the finding, not the failure. T1.7 exists to surface it. |
 | Documenting what exists uncovers behaviour nobody intended | Medium | Expected. M2 records what the code does, and anything that looks wrong becomes a task rather than a quiet fix. |

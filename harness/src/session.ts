@@ -1,5 +1,5 @@
 // One case session: a fresh world, a live subject, and a growing effect stream.
-import { openSqliteWorld } from "./world/sqlite.ts";
+import { openWorldFor } from "./world/open.ts";
 import type { EvalWorld } from "./world/index.ts";
 import { bindWorld } from "./runtime.ts";
 import type { AdapterContext, Effect, SubjectAdapter, SubjectSession } from "./types.ts";
@@ -39,10 +39,10 @@ export class Session {
     // Env must be set before the subject's config module is first imported.
     for (const [k, v] of Object.entries(adapter.env)) process.env[k] = v;
 
-    this.world = openSqliteWorld({
-      schemaFiles: adapter.schemaFiles,
+    this.world = await openWorldFor({
+      adapter,
       schemaPath,
-      rebuild: this.opts.rebuildSchema ?? false,
+      ...(this.opts.rebuildSchema !== undefined ? { rebuild: this.opts.rebuildSchema } : {}),
     });
 
     // Seed with the SUBJECT'S own seed code (ADAPT-4).

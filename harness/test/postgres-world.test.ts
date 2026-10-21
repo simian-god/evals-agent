@@ -11,12 +11,13 @@ import { test, expect, describe, beforeAll, afterAll, afterEach } from "bun:test
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SQL } from "bun";
 import {
   openPostgresWorld,
+  connection,
   databaseAvailable,
   databaseUrl,
   MARKER_TABLE,
+  closePostgresConnections,
 } from "../src/world/postgres.ts";
 import type { EvalWorld } from "../src/world/index.ts";
 
@@ -58,10 +59,10 @@ describe.skipIf(!available)("the Postgres world", () => {
   const open: EvalWorld[] = [];
   // One connection for the file, borrowed by every world in it. See the
   // note on PostgresWorldOptions.sql: Bun segfaults under pool churn.
-  let shared: SQL;
+  let shared: ReturnType<typeof connection>;
 
   beforeAll(() => {
-    shared = new SQL({ url: databaseUrl(), max: 1 });
+    shared = connection();
     dir = mkdtempSync(join(tmpdir(), "evals-pg-"));
     schemaFile = join(dir, "schema.sql");
     writeFileSync(schemaFile, SCHEMA, "utf8");
@@ -73,14 +74,13 @@ describe.skipIf(!available)("the Postgres world", () => {
 
   afterAll(async () => {
     // Leave the database as it was found: no tables, no marker.
-    const sql = new SQL({ url: databaseUrl(), max: 1 });
+    const sql = connection();
     // Only what these tests made. Another project's tables live in this
     // same development database and are none of our business.
     await sql.unsafe(
       `drop table if exists public.ob_people, public.ob_messages, public.${MARKER_TABLE}, public.not_ours, public.leftovers, public.someone_elses cascade`,
     );
-    await sql.close();
-    await shared.close();
+    await closePostgresConnections();
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -209,54 +209,49 @@ describe.skipIf(!available)("the Postgres world", () => {
     // world would not be a test run, it would be an outage. The harness
     // cannot tell a development database from a real one by looking, since
     // the subject's own migrations built both, so it does not guess.
-    const sql = new SQL({ url: databaseUrl(), max: 1 });
+    const sql = connection();
     await sql.unsafe(`drop table if exists public.${MARKER_TABLE}`);
     await sql.unsafe("create table if not exists ob_people (id int)");
-    await sql.close();
 
     await expect(
       openPostgresWorld({ schemaFiles: [schemaFile], rebuild: true, disposable: false }),
     ).rejects.toThrow(/did not build them/);
 
     // Still there. Nothing was dropped.
-    const check = new SQL({ url: databaseUrl(), max: 1 });
+    const check = connection();
     const rows = (await check`select tablename from pg_tables where schemaname='public'`) as {
       tablename: string;
     }[];
     expect(rows.map((r) => r.tablename)).toContain("ob_people");
-    await check.close();
   });
 
   test("PGW-5: another project's tables in the same database are left alone", async () => {
     // A development Postgres is shared. The first version of this world
     // dropped and truncated every table in the schema, which wrecked a
     // neighbouring project's tables in the course of running a suite.
-    const sql = new SQL({ url: databaseUrl(), max: 1 });
+    const sql = connection();
     await sql.unsafe("drop table if exists public.someone_elses cascade");
     await sql.unsafe("create table public.someone_elses (id int)");
     await sql.unsafe("insert into public.someone_elses (id) values (1), (2)");
-    await sql.close();
 
     // A rebuild, which is the most destructive thing this world does.
     const built = await world(true);
     expect(built.owns?.()).not.toContain("someone_elses");
 
-    const check = new SQL({ url: databaseUrl(), max: 1 });
+    const check = connection();
     const rows = (await check`select count(*)::int as n from public.someone_elses`) as {
       n: number;
     }[];
     // Neither dropped nor emptied.
     expect(rows[0]?.n).toBe(2);
     await check.unsafe("drop table public.someone_elses");
-    await check.close();
   });
 
   test("PGW-5: it empties one the builder has called disposable", async () => {
-    const sql = new SQL({ url: databaseUrl(), max: 1 });
+    const sql = connection();
     await sql.unsafe("drop table if exists ob_people, ob_messages cascade");
     await sql.unsafe(`drop table if exists ${MARKER_TABLE}`);
     await sql.unsafe("create table leftovers (id int)");
-    await sql.close();
 
     const built = await openPostgresWorld({
       schemaFiles: [schemaFile],
