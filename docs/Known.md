@@ -110,7 +110,34 @@ Postgres world.
 
 ---
 
-## K5. PostgREST is not in CI, so the recording client's tests skip there
+## K5. A bigint is a string in one world and a number in the other
+
+**Status:** open, and only in raw SQL.
+
+**What happens.** Reading a `bigserial` or `bigint` column through the Postgres
+world's `sql.all` gives `"1"`. The same read in the SQLite world gives `1`. Bun's
+Postgres client returns bigints as strings so a large one cannot lose precision;
+SQLite has no such problem and returns a number.
+
+**What it costs.** A precondition or a post case check written against such a
+column sees a different type depending on the world. It is not what the subject
+sees: a subject reads through PostgREST, which serialises its own way.
+
+**What it cost here.** A test comparing the two worlds' rows, which looked like
+a sequence bug and was not.
+
+**What we did.** Nothing in the harness. A comparison that cares about the value
+rather than the spelling uses `cast(seq as integer)`, which both engines
+understand.
+
+**What would resolve it.** Normalising in the Postgres world's `sql.all`, which
+means guessing which columns are bigints and giving up the precision the string
+is there to protect. Not worth it for a column nobody counts past a few
+thousand, but worth knowing before a case asserts on one.
+
+---
+
+## K6. PostgREST is not in CI, so the recording client's tests skip there
 
 **Status:** open. Scheduled as T1.8.
 
@@ -126,7 +153,7 @@ covered locally and not in CI.
 
 ---
 
-## K6. The Postgres test files share one database
+## K7. The Postgres test files share one database
 
 **Status:** open, and managed by convention.
 
