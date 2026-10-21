@@ -51,9 +51,21 @@ one, so there is nothing to translate and nothing to be missing.
 | T1.9 | Sequence columns in the SQLite world, so a subject that orders by one is not blocked on having a Postgres. Done out of order, before T1.6, at the builder's request | WORLD-5 |
 | M1 check | An openbox-agent subject runs green in the Postgres world, with no ported RPCs and no module mocking, and WORLD-6's three gaps are gone | PGW-1 to PGW-7 |
 
-**Done when:** a suite that cannot pass in the SQLite world because of
-WORLD-6 passes in the Postgres world, and an existing subject's suite gives the
-same verdicts in both.
+**Done when:**
+
+1. An openbox-agent subject runs under the harness with no module mocking and no
+   ported database functions.
+2. The same suite gives the same verdicts in both worlds.
+3. A case that depends on something only a real Postgres has passes in the
+   Postgres world and does not pass in the SQLite one. Either outcome counts,
+   failed or unverifiable; what must not happen is that it passes in a world
+   that could not actually have proved it.
+
+Reworded on 2026-10-21. The original asked for a suite that *cannot* pass in the
+SQLite world because of WORLD-6, and T1.9 removed the gap that made that true:
+sequences now count there. What is left of WORLD-6 is the missing SQLSTATE and
+the missing RLS, so item 3 is the same intent against the gaps that are still
+open.
 
 ### M2. Write down what exists
 
@@ -133,6 +145,9 @@ why.
 | 2026-10-20 | The eval world | A real Postgres world is added as an option, and the SQLite one stays the default (Spec section 7) | The translated world is missing things in a way that blames the subject. `bigserial` is not rewritten, so every sequence column is NULL and any order that uses one is undefined; every database error arrives under one code, so SQLSTATE cannot be read and a duplicate is indistinguishable from a crash. Both were found by pointing openbox-agent at the harness. Neither can be fixed in a subject: a sequence has to come from the database. Patching the translation would fix these two and not the class. A subject that already runs Postgres, which is every openbox-agent agent, has nothing to gain from the translation and everything to lose. |
 | 2026-10-20 | The eval world | SQLite is not removed | It needs nothing installed, and that is what lets the evaluator be pointed at any agent on any machine. Fidelity is worth having as a choice, not as a requirement. |
 | 2026-10-20 | Isolation | An eval never runs against a database holding real data, in either world | An adversarial run is trying to make the agent do damage. It must only ever be able to damage something disposable. A real Postgres world is a throwaway database, not the agent's own. |
+| 2026-10-21 | The SQLite world | A json column is parsed back into an object on the way out (WORLD-2) | The shim wrote an object as a string, because SQLite has no json type, and nothing parsed it on the way back. A subject reading `row.payload.text` got undefined. It stopped an openbox agent replying at all, and it looked exactly like a subject bug. Found by the M1 check, which is what that row is for. The columns are recorded as `-- json:` lines by the translator, because a marker inside the DDL is a marker SQLite has to parse, and it refused the first one. |
+| 2026-10-21 | Adapters | A tool's arguments become visible because the adapter records them, not because the subject does | openbox records that a tool ran, not what it was given: its `tool_runs` table is still ahead of it. So `must_call X with {...}` cannot be checked against an openbox subject from the subject's own events. An adapter may watch what it likes, so it records the call itself. Worth saying in the adapter docs, because the next subject will have the same shape. |
+| 2026-10-21 | M1 "Done when" | Reworded: an openbox subject runs with no mocking and no ported functions, the two worlds agree on a suite, and a case needing a real Postgres is unverifiable rather than passed in the SQLite one | The original bar asked for a suite that could not pass in the SQLite world because of WORLD-6. T1.9 closed the gap that made that true, so the bar could only have been met by undoing work. The intent was that the Postgres world proves something the other cannot, and SQLSTATE and RLS still do. |
 | 2026-10-20 | The SQLite world | A `serial` column is filled by the world, with a trigger (WORLD-5) | It was the last thing stopping an openbox-agent subject from running in the translated world, and the only one a subject could not work around: a number handed out by the database is the only kind two processes can agree on. A trigger rather than a patched insert path, because a row arrives three ways and patching one would have missed the seed script and raw SQL in a precondition. This makes the zero setup world usable for a subject that orders by a sequence, so the Postgres world is fidelity rather than a prerequisite. |
 | 2026-10-20 | The SQLite world | `insert ... select ... on conflict` gets the `where` SQLite's parser needs | Found by running openbox-agent's real migrations through the translator: a backfill in a real migration made the whole schema fail to build. Valid Postgres, rejected for a parser reason, which is exactly what the translator is for. |
 | 2026-10-20 | The Postgres world | Every drop and truncate is scoped to the tables the subject's own schema declares | A development Postgres is shared. The first version emptied every table in the schema between cases, which wrecked a neighbouring project's tables in the course of running a suite. Another project's tables are also no longer a reason to refuse a database, because the world will not touch them. |

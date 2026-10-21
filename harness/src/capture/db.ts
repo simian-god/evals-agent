@@ -21,6 +21,8 @@ interface Embed { alias: string; fk: string; inner: boolean; cols: string[] }
 
 export interface FakeDbOptions {
   pk: Record<string, string>;
+  /** Columns that were json in the subject's schema, by table. */
+  json?: Record<string, string[]>;
   rpcs: Record<string, (args: Record<string, unknown>, sql: any) => unknown>;
   emit: AdapterContext["emit"];
 }
@@ -236,10 +238,39 @@ class Query implements PromiseLike<{ data: any; error: any; count?: number }> {
   private run(sql: string, params: unknown[]): any[] {
     const stmt = this.db.query(sql);
     try {
-      return stmt.all(...(params as any[]));
+      return this.parseJson(stmt.all(...(params as any[])));
     } finally {
       stmt.finalize();
     }
+  }
+
+  /**
+   * A json column comes back as the string it was stored as.
+   *
+   * `coerce` writes an object as a string, because SQLite has no json
+   * type. Nothing parsed it on the way back, so a subject reading
+   * `row.payload.text` got undefined: a world bug that looked exactly like
+   * a subject bug, and the one that stopped an openbox agent replying.
+   */
+  private parseJson(rows: any[]): any[] {
+    const columns = this.o.json?.[this.table.toLowerCase()];
+    if (!columns?.length || rows.length === 0) return rows;
+
+    return rows.map((row) => {
+      if (row === null || typeof row !== "object") return row;
+      const out = { ...row };
+      for (const column of columns) {
+        const value = out[column];
+        if (typeof value !== "string") continue;
+        try {
+          out[column] = JSON.parse(value);
+        } catch {
+          // Not json after all. Leaving it alone is closer to what
+          // Postgres would have done than throwing here.
+        }
+      }
+      return out;
+    });
   }
 
   private doSelect(): any[] {

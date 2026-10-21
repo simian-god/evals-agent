@@ -10,6 +10,8 @@ import type { AsyncSqlRunner, DbLike, EvalWorld, RecordingOptions } from "./inde
 
 export interface World {
   db: Database;
+  /** Columns that were json in the subject's schema, by table. */
+  json: Record<string, string[]>;
   /** table -> single-column primary key (compound keys omitted). */
   pk: Record<string, string>;
   translation: TranslateResult;
@@ -37,12 +39,33 @@ function primaryKeys(ddl: string): Record<string, string> {
   return pk;
 }
 
+/**
+ * Columns that were json in the subject's schema, by table.
+ *
+ * Read back out of the `-- json:` lines the translator wrote. A comment,
+ * because a marker inside the DDL is a marker SQLite has to parse, and it
+ * refused the first one.
+ */
+function jsonColumns(ddl: string): Record<string, string[]> {
+  const found: Record<string, string[]> = {};
+  for (const line of ddl.matchAll(/^--\s*json:\s*([a-zA-Z_]\w*)\.([a-zA-Z_]\w*)\s*$/gim)) {
+    const table = line[1]!.toLowerCase();
+    found[table] = [...(found[table] ?? []), line[2]!.toLowerCase()];
+  }
+  return found;
+}
+
 export function openWorld(schemaPath: string): World {
   const ddl = readFileSync(schemaPath, "utf8");
   const db = new Database(":memory:");
   db.exec("pragma foreign_keys = off;"); // seed order is the subject's business, not ours
   db.exec(ddl);
-  return { db, pk: primaryKeys(ddl), translation: { sql: ddl, skipped: [], tables: Object.keys(primaryKeys(ddl)) } };
+  return {
+    db,
+    pk: primaryKeys(ddl),
+    json: jsonColumns(ddl),
+    translation: { sql: ddl, skipped: [], tables: Object.keys(primaryKeys(ddl)) },
+  };
 }
 
 /**
@@ -88,7 +111,12 @@ export function openSqliteWorld(options: {
     seedClient: () => makePgShim(world.db),
 
     recordingClient: (recording: RecordingOptions): DbLike =>
-      makeFakeDb(world.db, { pk: world.pk, rpcs: recording.rpcs, emit: recording.emit }),
+      makeFakeDb(world.db, {
+        pk: world.pk,
+        json: world.json,
+        rpcs: recording.rpcs,
+        emit: recording.emit,
+      }),
 
     /**
      * Spec WORLD-4 and WORLD-6. Said out loud rather than discovered by a

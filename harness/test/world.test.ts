@@ -289,6 +289,69 @@ test("the upsert rewrite leaves a real condition alone", () => {
   expect(upsertFromSelect(plain)).toBe(plain);
 });
 
+test("WORLD-2: a json column comes back as an object, not the string it was stored as", async () => {
+  // SQLite has no json type, so the shim writes an object as a string.
+  // Nothing parsed it on the way back, so a subject reading
+  // `row.payload.text` got undefined. It stopped an openbox agent replying
+  // at all, and it looked like a subject bug.
+  const schema = join(dir, "json.sql");
+  writeFileSync(
+    schema,
+    `
+    create table if not exists outbox (
+      id      uuid  primary key default gen_random_uuid(),
+      payload jsonb not null default '{}'::jsonb,
+      media   json
+    );
+    `,
+    "utf8",
+  );
+
+  const built = openSqliteWorld({
+    schemaFiles: [schema],
+    schemaPath: join(dir, "json.world.sql"),
+    rebuild: true,
+  });
+  open.push(built);
+
+  const db = built.recordingClient({ rpcs: {}, emit: () => {} });
+  const written = await db
+    .from("outbox")
+    .insert({ payload: { text: "Booked for 4.", buttons: [{ label: "Yes" }] } })
+    .select();
+  expect(written.error).toBeNull();
+
+  const read = await db.from("outbox").select("*");
+  const row = read.data?.[0] as { payload: { text: string; buttons: { label: string }[] } };
+
+  expect(typeof row.payload).toBe("object");
+  expect(row.payload.text).toBe("Booked for 4.");
+  expect(row.payload.buttons[0]?.label).toBe("Yes");
+  // Returned by the insert as well, not only by a later read.
+  expect((written.data?.[0] as { payload: { text: string } }).payload.text).toBe("Booked for 4.");
+});
+
+test("WORLD-2: a plain string in a json column is left alone rather than thrown over", async () => {
+  const schema = join(dir, "json2.sql");
+  writeFileSync(
+    schema,
+    "create table if not exists notes (id uuid primary key default gen_random_uuid(), body jsonb);",
+    "utf8",
+  );
+  const built = openSqliteWorld({
+    schemaFiles: [schema],
+    schemaPath: join(dir, "json2.world.sql"),
+    rebuild: true,
+  });
+  open.push(built);
+
+  await built.sql.run("insert into notes (id, body) values ('n1', 'not json at all')");
+  const db = built.recordingClient({ rpcs: {}, emit: () => {} });
+  const read = await db.from("notes").select("*");
+
+  expect((read.data?.[0] as { body: unknown }).body).toBe("not json at all");
+});
+
 test("teardown", () => {
   rmSync(dir, { recursive: true, force: true });
   expect(true).toBe(true);

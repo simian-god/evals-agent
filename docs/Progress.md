@@ -5,7 +5,7 @@ Where the work in `Plan.md` has got to. One row per task.
 Statuses: `todo`, `doing`, `done`, `blocked`. A milestone check row is done only
 when every item in that milestone's "Done when" passes.
 
-**Next task:** M1 check
+**Next task:** T1.8
 
 ## Before this plan
 
@@ -35,7 +35,7 @@ Added after T1.1, at the builder's request.
 | T1.7 | One subject's suite run both ways, and the two agree | done | 2026-10-21 | Real cases through the real parser and the real assertion engine, run in each world, comparing every assertion outcome and the verdict, not just the Effects. One case asserts on a table no world has, so blind is never green either side. Probing found my first version was weaker than it looked: with the sequence broken, SQLite returns all-null ordering in insertion order, so the replies matched by luck. It compares the rows and their numbers now. Also found that a bigint is a string in one world and a number in the other, which is Known K5. |
 | T1.8 | PostgREST in CI, so the recording client's tests run there instead of skipping | todo | | |
 | T1.9 | Sequence columns in the SQLite world | done | 2026-10-20 | A trigger per serial column, placed with its table so a backfill further down the migration is numbered too. Covers the subject's writes, its seed script and raw SQL, which patching one insert path would not. Also found by running openbox's real migrations through the translator: `insert ... select ... on conflict` made the whole schema fail to build, and now gets the `where` SQLite's parser needs. openbox's ten tables build in the translated world and its messages, inbox and events all number in order. |
-| M1 check | An openbox-agent subject runs green in the Postgres world, no ported RPCs, no module mocking, WORLD-6's gaps gone | todo | | |
+| M1 check | An openbox subject runs with no mocking and no ported functions, the two worlds agree on a suite, and a case needing a real Postgres does not pass in SQLite | done | 2026-10-21 | All three pass. An openbox agent runs under the harness over its own ten tables, with no mock.module and no ported functions. Both worlds give the same replies and the same verdict on the same case. A case resting on a real SQLSTATE passes in Postgres and fails in SQLite, which is the reason the choice exists. The check found a world bug that looked like a subject bug: a json column came back as a string, so the agent replied with nothing at all. |
 
 ## M2. Write down what exists
 
