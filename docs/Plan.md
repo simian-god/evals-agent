@@ -115,6 +115,14 @@ layer findings can be opened as openbox-agent tasks without rewriting.
 
 ---
 
+## 5. Known problems
+
+In `docs/Known.md`, so a workaround has one home rather than living in a commit
+message. The risks table above is what might go wrong; that file is what already
+has.
+
+---
+
 ## 5. Decisions log
 
 Every decision made during the build goes here, with the date, what changed and
